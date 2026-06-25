@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>家計簿</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: #f5f0ea; color: #5a5248; font-family: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif; }
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input, select, textarea, button { font-family: 'Zen Maru Gothic', sans-serif; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+    @keyframes fadeUp { from{opacity:0;transform:translate(-50%,8px)} to{opacity:1;transform:translate(-50%,0)} }
+    .shake { animation: shake 0.4s ease; }
+    .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); color:#fff; border-radius:20px; padding:10px 24px; font-size:18px; font-weight:700; z-index:100; white-space:nowrap; animation:fadeUp 0.3s ease; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+    .modal-bg { position:fixed; inset:0; background:rgba(90,82,72,0.35); display:flex; align-items:center; justify-content:center; z-index:200; backdrop-filter:blur(3px); }
+    .modal { background:#ede8e0; border-radius:20px; padding:28px 24px; max-width:300px; width:90%; text-align:center; box-shadow:0 8px 32px rgba(90,82,72,0.15); }
+    .hidden { display:none !important; }
+    #app { display:flex; flex-direction:column; align-items:center; padding-bottom:80px; min-height:100vh; }
+    header { width:100%; max-width:480px; padding:32px 24px 0; }
+    .content { width:100%; max-width:480px; padding:16px 24px 0; }
+    .tab-bar { display:flex; gap:0; background:#ede8e0; border-radius:24px; padding:4px; max-width:480px; width:100%; margin:20px 24px 0; border:1.5px solid #d8d0c4; }
+    .tab-btn { flex:1; padding:10px 0; border:none; border-radius:20px; cursor:pointer; background:transparent; color:#9a9080; font-weight:400; font-size:18px; transition:all 0.2s; }
+    .tab-btn.active-accent { background:#b5836a; color:#fff; font-weight:700; }
+    .tab-btn.active-gold { background:#c4a46b; color:#fff; font-weight:700; }
+    .card { background:#ede8e0; border-radius:14px; border:1.5px solid #d8d0c4; }
+    .surface { background:#ede8e0; }
+    .btn-primary { width:100%; padding:16px; border:none; border-radius:20px; color:#fff; font-size:19px; font-weight:700; cursor:pointer; letter-spacing:2px; }
+    .btn-gold { background:#c4a46b; box-shadow:0 4px 16px rgba(196,164,107,0.35); }
+    .btn-rose { background:#c47a8a; box-shadow:0 4px 16px rgba(196,122,138,0.35); }
+    .btn-green { background:#7fa68a; box-shadow:0 4px 16px rgba(127,166,138,0.35); }
+    .lbl { font-size:17px; letter-spacing:1.5px; color:#9a9080; text-transform:uppercase; margin-bottom:10px; }
+    .pill-bar { display:flex; gap:0; background:#ede8e0; border-radius:20px; padding:4px; border:1.5px solid #d8d0c4; }
+    .pill { flex:1; padding:10px 0; border:none; border-radius:20px; cursor:pointer; background:transparent; color:#9a9080; font-size:18px; transition:all 0.2s; }
+    .pill.active { color:#fff; font-weight:700; }
+    .entry-card { background:#ede8e0; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; border:1.5px solid #d8d0c4; margin-bottom:8px; }
+    .import-card { background:#ede8e0; border-radius:14px; padding:14px; border:1.5px solid #d8d0c4; margin-bottom:10px; transition:all 0.2s; }
+    .inner-input { width:100%; background:#e8e2d8; border:1px solid #d8d0c4; border-radius:8px; color:#5a5248; font-size:18px; padding:8px 10px; outline:none; }
+    select.inner-input { appearance:auto; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 削除確認モーダル（1件） -->
+  <div id="modal-delete" class="modal-bg hidden">
+    <div class="modal">
+      <div style="font-size:42px;margin-bottom:10px">🌿</div>
+      <div style="font-weight:700;font-size:20px;margin-bottom:8px">削除しますか？</div>
+      <div style="font-size:18px;color:#9a9080;margin-bottom:22px">この記録は元に戻せません</div>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeDeleteModal()" style="flex:1;padding:12px;border:1.5px solid #d8d0c4;border-radius:12px;background:transparent;color:#9a9080;cursor:pointer;font-size:18px">キャンセル</button>
+        <button onclick="doDelete()" style="flex:1;padding:12px;border:none;border-radius:12px;background:#c47a8a;color:#fff;cursor:pointer;font-size:18px;font-weight:700">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 月まとめ削除モーダル -->
+  <div id="modal-month" class="modal-bg hidden">
+    <div class="modal">
+      <div style="font-size:42px;margin-bottom:10px">🗑️</div>
+      <div id="modal-month-title" style="font-weight:700;font-size:20px;margin-bottom:8px"></div>
+      <div id="modal-month-count" style="font-size:17px;color:#9a9080;margin-bottom:6px"></div>
+      <div style="font-size:15px;color:#9a9080;margin-bottom:22px">元に戻すことはできません</div>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeMonthModal()" style="flex:1;padding:12px;border:1.5px solid #d8d0c4;border-radius:12px;background:transparent;color:#9a9080;cursor:pointer;font-size:17px">キャンセル</button>
+        <button onclick="doDeleteMonth()" style="flex:1;padding:12px;border:none;border-radius:12px;background:#c47a8a;color:#fff;cursor:pointer;font-size:17px;font-weight:700">削除する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ヘッダー -->
+  <header>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:22px">
+      <span style="font-size:33px;font-family:'Shippori Mincho',serif;font-weight:600;letter-spacing:2px;color:#b5836a">家計簿</span>
+      <span style="font-size:17px;color:#9a9080;letter-spacing:3px">KAKEIBO</span>
+    </div>
+    <div style="display:flex;align-items:center;background:#ede8e0;border-radius:16px;padding:12px 16px;border:1.5px solid #d8d0c4">
+      <button onclick="prevMonth()" style="background:none;border:none;color:#9a9080;font-size:28px;cursor:pointer;padding:0 12px">‹</button>
+      <span id="month-label" style="flex:1;text-align:center;font-weight:700;font-size:20px"></span>
+      <button onclick="nextMonth()" style="background:none;border:none;color:#9a9080;font-size:28px;cursor:pointer;padding:0 12px">›</button>
+      <button id="btn-delete-month" onclick="openMonthModal()" style="display:none;background:none;border:1px solid #d8d0c4;color:#9a9080;font-size:17px;cursor:pointer;padding:5px 10px;border-radius:8px;line-height:1">🗑️</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+      <div style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4">
+        <div style="font-size:16px;color:#9a9080;letter-spacing:1px;margin-bottom:5px">収入</div>
+        <div id="total-income" style="font-size:18px;font-weight:700;color:#7fa68a">¥0</div>
+      </div>
+      <div style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4">
+        <div style="font-size:16px;color:#9a9080;letter-spacing:1px;margin-bottom:5px">支出</div>
+        <div id="total-expense" style="font-size:18px;font-weight:700;color:#c47a8a">¥0</div>
+      </div>
+      <div style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4">
+        <div style="font-size:16px;color:#9a9080;letter-spacing:1px;margin-bottom:5px">収支</div>
+        <div id="total-balance" style="font-size:18px;font-weight:700">¥0</div>
+      </div>
+    </div>
+    <div id="breakdown-wrap" style="display:none;margin-top:14px;background:#ede8e0;border-radius:14px;padding:14px;border:1.5px solid #d8d0c4">
+      <div style="font-size:16px;color:#9a9080;letter-spacing:1px;margin-bottom:8px">支出内訳</div>
+      <div id="breakdown-bar" style="display:flex;height:8px;border-radius:8px;overflow:hidden;gap:2px"></div>
+      <div id="breakdown-legend" style="display:flex;flex-wrap:wrap;gap:5px 10px;margin-top:10px"></div>
+    </div>
+  </header>
+
+  <!-- タブ -->
+  <div class="tab-bar">
+    <button class="tab-btn active-accent" onclick="switchTab('list',this,'accent')">📋 一覧</button>
+    <button class="tab-btn" onclick="switchTab('add',this,'accent')">＋ 記録</button>
+    <button class="tab-btn" onclick="switchTab('import',this,'gold')">📋 一括入力</button>
+  </div>
+
+  <div class="content">
+
+    <!-- 一覧タブ -->
+    <div id="tab-list">
+      <div id="list-empty" style="text-align:center;color:#9a9080;margin-top:60px;display:none">
+        <div style="font-size:48px;margin-bottom:14px">🌾</div>
+        <div style="font-size:18px">この月の記録はまだありません</div>
+      </div>
+      <div id="list-entries"></div>
+    </div>
+
+    <!-- 記録タブ -->
+    <div id="tab-add" style="display:none">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="pill-bar">
+          <button id="pill-expense" class="pill active" style="background:#c47a8a" onclick="setType('expense')">支出</button>
+          <button id="pill-income" class="pill" onclick="setType('income')">収入</button>
+        </div>
+        <div>
+          <div class="lbl">カテゴリ</div>
+          <div id="cat-buttons" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div>
+          <div class="lbl">金額</div>
+          <div id="amount-wrap" style="display:flex;align-items:center;background:#ede8e0;border-radius:14px;padding:0 18px;border:1.5px solid #d8d0c4">
+            <span style="color:#9a9080;margin-right:8px;font-size:20px">¥</span>
+            <input type="number" id="inp-amount" placeholder="0" style="flex:1;background:none;border:none;outline:none;color:#5a5248;font-size:30px;font-weight:700;padding:14px 0" />
+          </div>
+        </div>
+        <div>
+          <div class="lbl">メモ（任意）</div>
+          <input type="text" id="inp-note" placeholder="例：スーパーでお買い物" style="width:100%;background:#ede8e0;border:1.5px solid #d8d0c4;border-radius:14px;color:#5a5248;font-size:18px;padding:14px 18px;outline:none" />
+        </div>
+        <div>
+          <div class="lbl">日付</div>
+          <input type="date" id="inp-date" style="width:100%;background:#ede8e0;border:1.5px solid #d8d0c4;border-radius:14px;color:#5a5248;font-size:18px;padding:14px 18px;outline:none;color-scheme:light" />
+        </div>
+        <button id="btn-submit" class="btn-primary btn-rose" onclick="handleSubmit()">記録する 🌿</button>
+      </div>
+    </div>
+
+    <!-- 一括入力タブ -->
+    <div id="tab-import" style="display:none">
+      <div id="import-form" style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:#ede8e0;border-radius:16px;padding:18px 16px;border:1.5px solid #d8d0c4">
+          <div style="font-weight:700;font-size:18px;margin-bottom:12px">📋 使い方</div>
+          <div style="font-size:18px;color:#5a5248;line-height:2">
+            <span style="color:#b5836a;font-weight:700">①</span> カード明細のスクショをAIチャットに送る<br>
+            <span style="color:#b5836a;font-weight:700">②</span> 下の「AIへの依頼文」をコピーして一緒に送る<br>
+            <span style="color:#b5836a;font-weight:700">③</span> AIが出力したテキストをそのまま下に貼り付ける<br>
+            <span style="color:#b5836a;font-weight:700">④</span>「読み取る」→確認・編集→記録！
+          </div>
+          <div style="margin-top:16px;background:#e8e2d8;border-radius:12px;padding:14px;border:1px solid #d8d0c4">
+            <div style="font-size:14px;color:#9a9080;margin-bottom:8px;letter-spacing:1px">AIへの依頼文</div>
+            <div style="font-size:16px;color:#5a5248;line-height:1.8;margin-bottom:12px">
+              この画像はカード明細です。支出を以下の形式で一行ずつ出力してください。カテゴリは「食費・日用品・交通費・光熱費・医療費・衣服・娯楽・通信費・ネット通販・サブスク・その他」から選んでください。<br>
+              <span style="font-family:monospace;font-size:15px;color:#b5836a">MM/DD 店名 ¥金額 カテゴリ</span>
+            </div>
+            <button id="btn-copy" onclick="copyPrompt()" style="width:100%;padding:11px;border:none;border-radius:12px;background:#b5836a;color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s">📋 依頼文をコピー</button>
+          </div>
+          <div style="margin-top:12px;background:#e8e2d8;border-radius:10px;padding:10px 14px;font-size:15px;color:#9a9080;font-family:monospace;line-height:2">
+            出力例：<br>05/10 コメダ珈琲 ¥1,050 食費<br>05/09 ダイソー ¥874 日用品
+          </div>
+        </div>
+        <div>
+          <div class="lbl">テキストを貼り付け</div>
+          <textarea id="import-text" rows="8" placeholder="AIが出力したリストをここに貼り付けてください" style="width:100%;background:#ede8e0;border:1.5px solid #d8d0c4;border-radius:14px;color:#5a5248;font-size:18px;padding:14px 16px;outline:none;resize:vertical;line-height:1.8"></textarea>
+        </div>
+        <div id="parse-error" style="display:none;background:#fdf0f0;border:1.5px solid #c47a8a;border-radius:12px;padding:12px 16px;font-size:18px;color:#c47a8a"></div>
+        <button class="btn-primary btn-gold" onclick="handleParse()">読み取る 🌿</button>
+      </div>
+
+      <div id="import-confirm" style="display:none;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div id="confirm-title" style="font-weight:700;font-size:19px"></div>
+          <button onclick="resetImport()" style="background:none;border:none;color:#9a9080;cursor:pointer;font-size:16px">← 貼り直す</button>
+        </div>
+        <div style="font-size:17px;color:#9a9080">チェックを外した項目は記録されません。内容も編集できます。</div>
+        <div id="import-items"></div>
+        <button id="btn-commit" class="btn-primary btn-gold" onclick="commitImport()"></button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "kakeibo_entries_v1";
+const CATEGORIES = {
+  expense: [
+    { id:"food",         label:"食費",       emoji:"🥗", color:"#b5836a" },
+    { id:"daily",        label:"日用品",     emoji:"🧴", color:"#a08c6e" },
+    { id:"transport",    label:"交通費",     emoji:"🚲", color:"#7a8c7e" },
+    { id:"utility",      label:"光熱費",     emoji:"🕯️", color:"#c4a46b" },
+    { id:"medical",      label:"医療費",     emoji:"🌿", color:"#7fa68a" },
+    { id:"clothing",     label:"衣服",       emoji:"🧺", color:"#9b8aaa" },
+    { id:"entertainment",label:"娯楽",       emoji:"🎨", color:"#c47a8a" },
+    { id:"telecom",      label:"通信費",     emoji:"📱", color:"#7a9abf" },
+    { id:"shopping",     label:"ネット通販", emoji:"🛒", color:"#bf9a7a" },
+    { id:"subscription", label:"サブスク",   emoji:"🎵", color:"#9abf7a" },
+    { id:"other_exp",    label:"その他",     emoji:"🪴", color:"#9a9480" },
+  ],
+  income: [
+    { id:"salary",    label:"給与",   emoji:"💛", color:"#7fa68a" },
+    { id:"freelance", label:"副業",   emoji:"🌸", color:"#9b8aaa" },
+    { id:"other_inc", label:"その他", emoji:"🍀", color:"#9a9480" },
+  ],
+};
+const ALL_CATS = [...CATEGORIES.expense, ...CATEGORIES.income];
+const getCat = id => ALL_CATS.find(c => c.id === id) || { label:"不明", emoji:"🌾", color:"#ccc" };
+const MONTHS = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const fmt = n => Number(n).toLocaleString("ja-JP");
+
+let entries = [];
+let filterYear = new Date().getFullYear();
+let filterMonth = new Date().getMonth();
+let currentType = "expense";
+let currentCat = "food";
+let deleteTargetId = null;
+let importParsed = [];
+
+function load() { try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { entries = []; } }
+function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch {} }
+
+function showToast(msg, color="#7fa68a") {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.background = color;
+  t.classList.remove("hidden");
+  setTimeout(() => t.classList.add("hidden"), 2200);
+}
+
+// ── 月ナビ ──
+function prevMonth() { if(filterMonth===0){filterMonth=11;filterYear--;}else filterMonth--; render(); }
+function nextMonth() { if(filterMonth===11){filterMonth=0;filterYear++;}else filterMonth++; render(); }
+
+function getFiltered() {
+  return entries.filter(e => { const d=new Date(e.date); return d.getFullYear()===filterYear && d.getMonth()===filterMonth; })
+    .sort((a,b) => b.date.localeCompare(a.date));
+}
+
+// ── タブ切り替え ──
+function switchTab(name, btn, color) {
+  ["list","add","import"].forEach(t => document.getElementById("tab-"+t).style.display = t===name ? "block" : "none");
+  document.querySelectorAll(".tab-btn").forEach(b => { b.classList.remove("active-accent","active-gold"); });
+  btn.classList.add(color==="gold" ? "active-gold" : "active-accent");
+}
+
+// ── カテゴリボタン描画 ──
+function renderCatButtons() {
+  const wrap = document.getElementById("cat-buttons");
+  wrap.innerHTML = "";
+  CATEGORIES[currentType].forEach(cat => {
+    const b = document.createElement("button");
+    b.textContent = cat.emoji + " " + cat.label;
+    b.style.cssText = `padding:8px 14px;border-radius:20px;font-size:15px;cursor:pointer;transition:all 0.15s;font-family:'Zen Maru Gothic',sans-serif;`;
+    const active = currentCat === cat.id;
+    b.style.border = `1.5px solid ${active ? cat.color : "#d8d0c4"}`;
+    b.style.background = active ? cat.color+"28" : "#ede8e0";
+    b.style.color = active ? cat.color : "#9a9080";
+    b.style.fontWeight = active ? "700" : "400";
+    b.onclick = () => { currentCat = cat.id; renderCatButtons(); };
+    wrap.appendChild(b);
+  });
+}
+
+// ── 収支トグル ──
+function setType(type) {
+  currentType = type;
+  currentCat = type === "expense" ? "food" : "salary";
+  const pe = document.getElementById("pill-expense");
+  const pi = document.getElementById("pill-income");
+  const bs = document.getElementById("btn-submit");
+  if(type==="expense"){
+    pe.style.background="#c47a8a"; pe.style.color="#fff"; pe.style.fontWeight="700";
+    pi.style.background="transparent"; pi.style.color="#9a9080"; pi.style.fontWeight="400";
+    bs.style.background="#c47a8a"; bs.style.boxShadow="0 4px 16px rgba(196,122,138,0.35)";
+  } else {
+    pi.style.background="#7fa68a"; pi.style.color="#fff"; pi.style.fontWeight="700";
+    pe.style.background="transparent"; pe.style.color="#9a9080"; pe.style.fontWeight="400";
+    bs.style.background="#7fa68a"; bs.style.boxShadow="0 4px 16px rgba(127,166,138,0.35)";
+  }
+  renderCatButtons();
+}
+
+// ── 記録送信 ──
+function handleSubmit() {
+  const amt = Number(document.getElementById("inp-amount").value);
+  if(!amt || amt <= 0) {
+    const w = document.getElementById("amount-wrap");
+    w.style.border = "2px solid #c47a8a";
+    w.classList.add("shake");
+    setTimeout(() => { w.classList.remove("shake"); w.style.border="1.5px solid #d8d0c4"; }, 500);
+    return;
+  }
+  const entry = {
+    id: Date.now(), type: currentType, category: currentCat,
+    amount: amt,
+    note: document.getElementById("inp-note").value,
+    date: document.getElementById("inp-date").value || new Date().toISOString().slice(0,10),
+  };
+  entries.unshift(entry); save();
+  document.getElementById("inp-amount").value = "";
+  document.getElementById("inp-note").value = "";
+  showToast("✓ 記録しました");
+  switchTab("list", document.querySelector(".tab-btn"), "accent");
+  render();
+}
+
+// ── 削除 ──
+function openDeleteModal(id) { deleteTargetId = id; document.getElementById("modal-delete").classList.remove("hidden"); }
+function closeDeleteModal() { document.getElementById("modal-delete").classList.add("hidden"); }
+function doDelete() {
+  entries = entries.filter(e => e.id !== deleteTargetId);
+  save(); closeDeleteModal(); render();
+}
+
+// ── 月まとめ削除 ──
+function openMonthModal() {
+  const f = getFiltered();
+  document.getElementById("modal-month-title").textContent = filterYear+"年"+MONTHS[filterMonth]+"を削除";
+  document.getElementById("modal-month-count").innerHTML = "この月の記録 <span style='font-weight:700;color:#c47a8a'>"+f.length+"件</span> をすべて削除します";
+  document.getElementById("modal-month").classList.remove("hidden");
+}
+function closeMonthModal() { document.getElementById("modal-month").classList.add("hidden"); }
+function doDeleteMonth() {
+  const count = getFiltered().length;
+  entries = entries.filter(e => { const d=new Date(e.date); return !(d.getFullYear()===filterYear && d.getMonth()===filterMonth); });
+  save(); closeMonthModal(); showToast("🗑️ "+count+"件を削除しました","#c47a8a"); render();
+}
+
+// ── 一括入力パース ──
+const CAT_NAME_MAP = {};
+ALL_CATS.forEach(c => { CAT_NAME_MAP[c.label]=c.id; CAT_NAME_MAP[c.emoji]=c.id; });
+
+function parseImportText(text) {
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  const results = []; const cy = new Date().getFullYear();
+  for(const line of lines) {
+    if(line.startsWith("|---")) continue;
+    const tm = line.match(/\|\s*(\d{2,4}[\/\-]\d{1,2}(?:[\/\-]\d{1,2})?)\s*\|[^|]*\|\s*[¥￥]?([\d,]+)\s*\|\s*(.+?)\s*\|/);
+    if(tm){ const e=buildEntry(tm[1],tm[2],tm[3],cy); if(e) results.push(e); continue; }
+    const pm = line.match(/(\d{2,4}[\/\-]\d{1,2}(?:[\/\-]\d{1,2})?)\s+(.+?)\s+[¥￥]?([\d,]+)(?:円)?\s*(.+)?/);
+    if(pm){ const e=buildEntry(pm[1],pm[3],pm[4]||"",cy,pm[2]); if(e) results.push(e); }
+  }
+  return results;
+}
+function buildEntry(rawDate,rawAmt,rawCat,year,noteOverride) {
+  const amount = Number(rawAmt.replace(/,/g,""));
+  if(!amount||amount<=0) return null;
+  const parts = rawDate.split(/[\/\-]/);
+  const dateStr = parts.length===3
+    ? `${parts[0]}-${parts[1].padStart(2,"0")}-${parts[2].padStart(2,"0")}`
+    : `${year}-${parts[0].padStart(2,"0")}-${parts[1].padStart(2,"0")}`;
+  let catId="other_exp";
+  for(const [name,id] of Object.entries(CAT_NAME_MAP)){ if(rawCat.includes(name)){catId=id;break;} }
+  const note = noteOverride || rawCat.replace(/[🥗🧴🚲🕯🌿🧺🎨🪴📱🛒🎵💛🌸🍀]/g,"").trim();
+  return { date:dateStr, amount, category:catId, type:"expense", note, checked:true };
+}
+
+function handleParse() {
+  const text = document.getElementById("import-text").value;
+  const errEl = document.getElementById("parse-error");
+  errEl.style.display="none";
+  if(!text.trim()){ errEl.textContent="テキストを貼り付けてください"; errEl.style.display="block"; return; }
+  const items = parseImportText(text);
+  if(!items.length){ errEl.textContent="読み取れる項目がありませんでした。フォーマットを確認してください。"; errEl.style.display="block"; return; }
+  importParsed = items.map((item,i)=>({...item,_id:i}));
+  renderImportConfirm();
+}
+
+function renderImportConfirm() {
+  document.getElementById("import-form").style.display="none";
+  const conf = document.getElementById("import-confirm");
+  conf.style.display="flex";
+  document.getElementById("confirm-title").textContent="確認 · "+importParsed.length+"件";
+  const wrap = document.getElementById("import-items");
+  wrap.innerHTML="";
+  importParsed.forEach(r => {
+    const cat = getCat(r.category);
+    const div = document.createElement("div");
+    div.className="import-card";
+    div.id="icard-"+r._id;
+    div.style.borderColor = r.checked ? cat.color : "#d8d0c4";
+    div.style.opacity = r.checked ? "1" : "0.5";
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:${r.checked?'12px':'0'}">
+        <input type="checkbox" ${r.checked?"checked":""} onchange="toggleImportItem(${r._id})" style="width:20px;height:20px;accent-color:${cat.color};cursor:pointer;flex-shrink:0">
+        <span style="font-size:22px">${cat.emoji}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:18px;font-weight:700;color:${cat.color}">${cat.label}</div>
+          <div style="font-size:16px;color:#9a9080;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.note} · ${r.date}</div>
+        </div>
+        <div style="font-size:18px;font-weight:700;color:#c47a8a;flex-shrink:0">¥${fmt(r.amount)}</div>
+      </div>
+      <div id="iedit-${r._id}" style="display:${r.checked?'flex':'none'};flex-direction:column;gap:8px;padding-left:30px">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><div style="font-size:14px;color:#9a9080;margin-bottom:4px">金額</div>
+            <input type="number" value="${r.amount}" class="inner-input" onchange="updateImportItem(${r._id},'amount',this.value)"></div>
+          <div style="flex:1"><div style="font-size:14px;color:#9a9080;margin-bottom:4px">日付</div>
+            <input type="date" value="${r.date}" class="inner-input" style="color-scheme:light" onchange="updateImportItem(${r._id},'date',this.value)"></div>
+        </div>
+        <div><div style="font-size:14px;color:#9a9080;margin-bottom:4px">カテゴリ</div>
+          <select class="inner-input" onchange="updateImportItem(${r._id},'category',this.value)">
+            ${ALL_CATS.map(c=>`<option value="${c.id}" ${r.category===c.id?"selected":""}>${c.emoji} ${c.label}</option>`).join("")}
+          </select></div>
+        <div><div style="font-size:14px;color:#9a9080;margin-bottom:4px">メモ</div>
+          <input type="text" value="${r.note}" class="inner-input" onchange="updateImportItem(${r._id},'note',this.value)"></div>
+      </div>`;
+    wrap.appendChild(div);
+  });
+  updateCommitBtn();
+}
+
+function toggleImportItem(id) {
+  const r = importParsed.find(r=>r._id===id);
+  r.checked = !r.checked;
+  const cat = getCat(r.category);
+  const card = document.getElementById("icard-"+id);
+  card.style.borderColor = r.checked ? cat.color : "#d8d0c4";
+  card.style.opacity = r.checked ? "1" : "0.5";
+  document.getElementById("iedit-"+id).style.display = r.checked ? "flex" : "none";
+  updateCommitBtn();
+}
+function updateImportItem(id, field, value) {
+  const r = importParsed.find(r=>r._id===id);
+  r[field] = field==="amount" ? Number(value) : value;
+}
+function updateCommitBtn() {
+  const n = importParsed.filter(r=>r.checked).length;
+  document.getElementById("btn-commit").textContent = "✓ "+n+"件を記録する";
+}
+function commitImport() {
+  const toAdd = importParsed.filter(r=>r.checked).map((r,i)=>({
+    id: Date.now()+i, type:"expense", category:r.category,
+    amount:Number(r.amount), note:r.note, date:r.date,
+  }));
+  if(!toAdd.length){ showToast("項目を選択してください","#c47a8a"); return; }
+  entries = [...toAdd, ...entries]; save();
+  resetImport();
+  showToast("✓ "+toAdd.length+"件を記録しました");
+  switchTab("list", document.querySelectorAll(".tab-btn")[0], "accent");
+  render();
+}
+function resetImport() {
+  importParsed=[];
+  document.getElementById("import-text").value="";
+  document.getElementById("parse-error").style.display="none";
+  document.getElementById("import-form").style.display="flex";
+  document.getElementById("import-confirm").style.display="none";
+}
+
+// ── コピー ──
+function copyPrompt() {
+  const text = "この画像はカード明細です。支出を以下の形式で一行ずつ出力してください。カテゴリは「食費・日用品・交通費・光熱費・医療費・衣服・娯楽・通信費・ネット通販・サブスク・その他」から選んでください。\nMM/DD 店名 ¥金額 カテゴリ";
+  const btn = document.getElementById("btn-copy");
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent="✓ コピーしました！"; btn.style.background="#7fa68a";
+    setTimeout(()=>{ btn.textContent="📋 依頼文をコピー"; btn.style.background="#b5836a"; },2000);
+  }).catch(()=>{
+    const el=document.createElement("textarea"); el.value=text;
+    document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
+    btn.textContent="✓ コピーしました！"; btn.style.background="#7fa68a";
+    setTimeout(()=>{ btn.textContent="📋 依頼文をコピー"; btn.style.background="#b5836a"; },2000);
+  });
+}
+
+// ── メイン描画 ──
+function render() {
+  document.getElementById("month-label").textContent = filterYear+"年 "+MONTHS[filterMonth];
+  const filtered = getFiltered();
+  const income  = filtered.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);
+  const expense = filtered.filter(e=>e.type==="expense").reduce((s,e)=>s+e.amount,0);
+  const balance = income - expense;
+  document.getElementById("total-income").textContent  = "¥"+fmt(income);
+  document.getElementById("total-expense").textContent = "¥"+fmt(expense);
+  const balEl = document.getElementById("total-balance");
+  balEl.textContent = (balance>0?"+":"")+"¥"+fmt(Math.abs(balance));
+  balEl.style.color = balance>=0 ? "#7fa68a" : "#c47a8a";
+
+  // 月削除ボタン
+  document.getElementById("btn-delete-month").style.display = filtered.length>0 ? "block" : "none";
+
+  // 内訳
+  const bwrap = document.getElementById("breakdown-wrap");
+  if(expense>0){
+    const map={};
+    filtered.filter(e=>e.type==="expense").forEach(e=>{ map[e.category]=(map[e.category]||0)+e.amount; });
+    const bd = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    bwrap.style.display="block";
+    document.getElementById("breakdown-bar").innerHTML = bd.map(([id,amt])=>{
+      const cat=getCat(id);
+      return `<div style="flex:${amt/expense};background:${cat.color};transition:flex 0.4s ease" title="${cat.label}"></div>`;
+    }).join("");
+    document.getElementById("breakdown-legend").innerHTML = bd.map(([id,amt])=>{
+      const cat=getCat(id);
+      return `<div style="display:flex;align-items:center;gap:4px;font-size:14px;color:#9a9080">
+        <span style="width:8px;height:8px;border-radius:2px;background:${cat.color};display:inline-block"></span>
+        ${cat.label} ¥${fmt(amt)}</div>`;
+    }).join("");
+  } else { bwrap.style.display="none"; }
+
+  // 一覧
+  const listEl = document.getElementById("list-entries");
+  const emptyEl = document.getElementById("list-empty");
+  if(filtered.length===0){ emptyEl.style.display="block"; listEl.innerHTML=""; return; }
+  emptyEl.style.display="none";
+  listEl.innerHTML = filtered.map(e=>{
+    const cat=getCat(e.category);
+    return `<div class="entry-card" style="border-left:4px solid ${cat.color}">
+      <span style="font-size:24px">${cat.emoji}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:17px;font-weight:700">${cat.label}</div>
+        ${e.note?`<div style="font-size:15px;color:#9a9080;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.note}</div>`:""}
+        <div style="font-size:14px;color:#9a9080;margin-top:2px">${e.date}</div>
+      </div>
+      <div style="font-size:17px;font-weight:700;color:${e.type==="income"?"#7fa68a":"#c47a8a"}">${e.type==="income"?"+":"-"}¥${fmt(e.amount)}</div>
+      <button onclick="openDeleteModal(${e.id})" style="background:none;border:1px solid #d8d0c4;color:#9a9080;cursor:pointer;font-size:15px;padding:4px 10px;border-radius:8px">×</button>
+    </div>`;
+  }).join("");
+}
+
+// ── 初期化 ──
+load();
+document.getElementById("inp-date").value = new Date().toISOString().slice(0,10);
+renderCatButtons();
+render();
+</script>
+</body>
+</html>
