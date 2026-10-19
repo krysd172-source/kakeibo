@@ -77,11 +77,29 @@
     </div>
   </div>
 
+  <!-- 設定モーダル（バックアップ/復元） -->
+  <div id="modal-settings" class="modal-bg hidden">
+    <div class="modal" style="max-width:320px">
+      <div style="font-size:38px;margin-bottom:10px">💾</div>
+      <div style="font-weight:700;font-size:20px;margin-bottom:14px">データのバックアップ</div>
+      <div style="font-size:15px;color:#9a9080;margin-bottom:20px;line-height:1.8;text-align:left">アプリを更新・再インストールする前にバックアップを取っておくと、データを失わずに復元できます。</div>
+      <button onclick="exportData()" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7fa68a;color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'Zen Maru Gothic',sans-serif">📤 バックアップを書き出す</button>
+      <label style="display:block;width:100%;padding:13px;border-radius:12px;background:#b5836a;color:#fff;font-size:16px;font-weight:700;cursor:pointer;text-align:center;margin-bottom:18px;box-sizing:border-box">
+        📥 バックアップを読み込む
+        <input type="file" accept="application/json" onchange="importData(event)" style="display:none">
+      </label>
+      <button onclick="closeSettings()" style="width:100%;padding:12px;border:1.5px solid #d8d0c4;border-radius:12px;background:transparent;color:#9a9080;cursor:pointer;font-size:15px;font-family:'Zen Maru Gothic',sans-serif">閉じる</button>
+    </div>
+  </div>
+
   <!-- ヘッダー -->
   <header>
-    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:22px">
-      <span style="font-size:33px;font-family:'Shippori Mincho',serif;font-weight:600;letter-spacing:2px;color:#b5836a">家計簿</span>
-      <span style="font-size:17px;color:#9a9080;letter-spacing:3px">KAKEIBO</span>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-size:33px;font-family:'Shippori Mincho',serif;font-weight:600;letter-spacing:2px;color:#b5836a">家計簿</span>
+        <span style="font-size:17px;color:#9a9080;letter-spacing:3px">KAKEIBO</span>
+      </div>
+      <button onclick="openSettings()" style="background:none;border:1px solid #d8d0c4;border-radius:10px;color:#9a9080;font-size:19px;cursor:pointer;padding:6px 10px;line-height:1">⚙️</button>
     </div>
     <div style="display:flex;align-items:center;background:#ede8e0;border-radius:16px;padding:12px 16px;border:1.5px solid #d8d0c4">
       <button onclick="prevMonth()" style="background:none;border:none;color:#9a9080;font-size:28px;cursor:pointer;padding:0 12px">‹</button>
@@ -90,11 +108,11 @@
       <button id="btn-delete-month" onclick="openMonthModal()" style="display:none;background:none;border:1px solid #d8d0c4;color:#9a9080;font-size:17px;cursor:pointer;padding:5px 10px;border-radius:8px;line-height:1">🗑️</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
-      <div style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4">
+      <div id="card-income" onclick="toggleTypeFilter('income')" style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4;cursor:pointer">
         <div style="font-size:16px;color:#9a9080;letter-spacing:1px;margin-bottom:5px">収入</div>
         <div id="total-income" style="font-size:18px;font-weight:700;color:#7fa68a">¥0</div>
       </div>
-      <div style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4">
+      <div id="card-expense" onclick="toggleTypeFilter('expense')" style="background:#ede8e0;border-radius:14px;padding:14px 8px;text-align:center;border:1.5px solid #d8d0c4;cursor:pointer">
         <div style="font-size:16px;color:#9a9080;letter-spacing:1px;margin-bottom:5px">支出</div>
         <div id="total-expense" style="font-size:18px;font-weight:700;color:#c47a8a">¥0</div>
       </div>
@@ -121,9 +139,13 @@
 
     <!-- 一覧タブ -->
     <div id="tab-list">
+      <div id="list-filter-bar" style="display:none;align-items:center;gap:8px;margin-bottom:12px;background:#e8e2d8;border-radius:12px;padding:10px 14px;border:1.5px solid #d8d0c4">
+        <span id="list-filter-label" style="flex:1;font-size:15px;color:#5a5248;font-weight:700"></span>
+        <button onclick="clearListFilter()" style="background:none;border:1px solid #d8d0c4;border-radius:8px;color:#9a9080;cursor:pointer;font-size:14px;padding:4px 10px;font-family:'Zen Maru Gothic',sans-serif">✕ 解除</button>
+      </div>
       <div id="list-empty" style="text-align:center;color:#9a9080;margin-top:60px;display:none">
         <div style="font-size:48px;margin-bottom:14px">🌾</div>
-        <div style="font-size:18px">この月の記録はまだありません</div>
+        <div id="list-empty-text" style="font-size:18px">この月の記録はまだありません</div>
       </div>
       <div id="list-entries"></div>
     </div>
@@ -154,7 +176,10 @@
           <div class="lbl">日付</div>
           <input type="date" id="inp-date" style="width:100%;background:#ede8e0;border:1.5px solid #d8d0c4;border-radius:14px;color:#5a5248;font-size:18px;padding:14px 18px;outline:none;color-scheme:light" />
         </div>
-        <button id="btn-submit" class="btn-primary btn-rose" onclick="handleSubmit()">記録する 🌿</button>
+        <div style="display:flex;gap:10px">
+          <button id="btn-submit" class="btn-primary btn-rose" style="flex:1;width:auto" onclick="handleSubmit(false)">記録する 🌿</button>
+          <button id="btn-submit-continue" class="btn-primary" style="flex:1;width:auto;background:#9a9080" onclick="handleSubmit(true)">続けて入力 ➕</button>
+        </div>
       </div>
     </div>
 
@@ -172,7 +197,7 @@
           <div style="margin-top:16px;background:#e8e2d8;border-radius:12px;padding:14px;border:1px solid #d8d0c4">
             <div style="font-size:14px;color:#9a9080;margin-bottom:8px;letter-spacing:1px">AIへの依頼文</div>
             <div style="font-size:16px;color:#5a5248;line-height:1.8;margin-bottom:12px">
-              この画像はカード明細です。支出を以下の形式で一行ずつ出力してください。カテゴリは「食費・日用品・交通費・光熱費・医療費・衣服・娯楽・通信費・ネット通販・サブスク・その他」から選んでください。<br>
+              この画像はカード明細です。支出を以下の形式で一行ずつ出力してください。オートチャージなど「チャージ」に関する取引は含めないでください。カテゴリは「食費・日用品・交通費・光熱費・医療費・衣服・娯楽・通信費・ネット通販・サブスク・その他」から選んでください。<br>
               <span style="font-family:monospace;font-size:15px;color:#b5836a">MM/DD 店名 ¥金額 カテゴリ</span>
             </div>
             <button id="btn-copy" onclick="copyPrompt()" style="width:100%;padding:11px;border:none;border-radius:12px;background:#b5836a;color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:background 0.2s">📋 依頼文をコピー</button>
@@ -237,6 +262,8 @@ let currentType = "expense";
 let currentCat = "food";
 let deleteTargetId = null;
 let importParsed = [];
+let listFilterType = null;
+let listFilterCategory = null;
 
 function load() { try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { entries = []; } }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); } catch {} }
@@ -255,6 +282,24 @@ function nextMonth() { if(filterMonth===11){filterMonth=0;filterYear++;}else fil
 function getFiltered() {
   return entries.filter(e => { const d=new Date(e.date); return d.getFullYear()===filterYear && d.getMonth()===filterMonth; })
     .sort((a,b) => b.date.localeCompare(a.date));
+}
+
+// ── 一覧の絞り込み ──
+function toggleTypeFilter(type) {
+  listFilterType = (listFilterType === type) ? null : type;
+  listFilterCategory = null;
+  switchTab("list", document.querySelectorAll(".tab-btn")[0], "accent");
+  render();
+}
+function toggleCategoryFilter(catId) {
+  listFilterCategory = (listFilterCategory === catId) ? null : catId;
+  listFilterType = listFilterCategory ? "expense" : null;
+  switchTab("list", document.querySelectorAll(".tab-btn")[0], "accent");
+  render();
+}
+function clearListFilter() {
+  listFilterType = null; listFilterCategory = null;
+  render();
 }
 
 // ── タブ切り替え ──
@@ -302,7 +347,7 @@ function setType(type) {
 }
 
 // ── 記録送信 ──
-function handleSubmit() {
+function handleSubmit(continueMode) {
   const amt = Number(document.getElementById("inp-amount").value);
   if(!amt || amt <= 0) {
     const w = document.getElementById("amount-wrap");
@@ -321,8 +366,13 @@ function handleSubmit() {
   document.getElementById("inp-amount").value = "";
   document.getElementById("inp-note").value = "";
   showToast("✓ 記録しました");
-  switchTab("list", document.querySelector(".tab-btn"), "accent");
-  render();
+  if (continueMode) {
+    render();
+    document.getElementById("inp-amount").focus();
+  } else {
+    switchTab("list", document.querySelectorAll(".tab-btn")[0], "accent");
+    render();
+  }
 }
 
 // ── 削除 ──
@@ -345,6 +395,53 @@ function doDeleteMonth() {
   const count = getFiltered().length;
   entries = entries.filter(e => { const d=new Date(e.date); return !(d.getFullYear()===filterYear && d.getMonth()===filterMonth); });
   save(); closeMonthModal(); showToast("🗑️ "+count+"件を削除しました","#c47a8a"); render();
+}
+
+// ── 設定（バックアップ/復元） ──
+function openSettings() { document.getElementById("modal-settings").classList.remove("hidden"); }
+function closeSettings() { document.getElementById("modal-settings").classList.add("hidden"); }
+
+function exportData() {
+  const data = JSON.stringify(entries, null, 2);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = "kakeibo_backup_" + dateStr + ".json";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("✓ バックアップを書き出しました");
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error("invalid");
+      const existingIds = new Set(entries.map(x => x.id));
+      let added = 0;
+      data.forEach(item => {
+        if (item && typeof item.amount === "number" && item.date && item.category && item.type) {
+          let id = item.id;
+          if (!id || existingIds.has(id)) id = Date.now() + Math.floor(Math.random()*100000);
+          existingIds.add(id);
+          entries.push({ id, type: item.type, category: item.category, amount: item.amount, note: item.note || "", date: item.date });
+          added++;
+        }
+      });
+      save();
+      closeSettings();
+      showToast("✓ " + added + "件を復元しました");
+      render();
+    } catch (err) {
+      showToast("読み込みに失敗しました", "#c47a8a");
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = "";
 }
 
 // ── 一括入力パース ──
@@ -470,7 +567,7 @@ function resetImport() {
 
 // ── コピー ──
 function copyPrompt() {
-  const text = "この画像はカード明細です。支出を以下の形式で一行ずつ出力してください。カテゴリは「食費・日用品・交通費・光熱費・医療費・衣服・娯楽・通信費・ネット通販・サブスク・その他」から選んでください。\nMM/DD 店名 ¥金額 カテゴリ";
+  const text = "この画像はカード明細です。支出を以下の形式で一行ずつ出力してください。オートチャージなど「チャージ」に関する取引は含めないでください。カテゴリは「食費・日用品・交通費・光熱費・医療費・衣服・娯楽・通信費・ネット通販・サブスク・その他」から選んでください。\nMM/DD 店名 ¥金額 カテゴリ";
   const btn = document.getElementById("btn-copy");
   navigator.clipboard.writeText(text).then(()=>{
     btn.textContent="✓ コピーしました！"; btn.style.background="#7fa68a";
@@ -499,6 +596,10 @@ function render() {
   // 月削除ボタン
   document.getElementById("btn-delete-month").style.display = filtered.length>0 ? "block" : "none";
 
+  // 収入/支出カードのアクティブ表示
+  document.getElementById("card-income").style.border = listFilterType==="income" ? "2px solid #7fa68a" : "1.5px solid #d8d0c4";
+  document.getElementById("card-expense").style.border = listFilterType==="expense" ? "2px solid #c47a8a" : "1.5px solid #d8d0c4";
+
   // 内訳
   const bwrap = document.getElementById("breakdown-wrap");
   if(expense>0){
@@ -512,18 +613,41 @@ function render() {
     }).join("");
     document.getElementById("breakdown-legend").innerHTML = bd.map(([id,amt])=>{
       const cat=getCat(id);
-      return `<div style="display:flex;align-items:center;gap:4px;font-size:14px;color:#9a9080">
+      const active = listFilterCategory === id;
+      return `<button onclick="toggleCategoryFilter('${id}')" style="display:flex;align-items:center;gap:4px;font-size:14px;color:${active?cat.color:'#9a9080'};background:${active?cat.color+'22':'transparent'};border:1px solid ${active?cat.color:'transparent'};border-radius:10px;padding:3px 9px;cursor:pointer;font-weight:${active?700:400};font-family:'Zen Maru Gothic',sans-serif">
         <span style="width:8px;height:8px;border-radius:2px;background:${cat.color};display:inline-block"></span>
-        ${cat.label} ¥${fmt(amt)}</div>`;
+        ${cat.label} ¥${fmt(amt)}</button>`;
     }).join("");
   } else { bwrap.style.display="none"; }
 
-  // 一覧
+  // フィルターバー
+  const fbar = document.getElementById("list-filter-bar");
+  const flabel = document.getElementById("list-filter-label");
+  if (listFilterCategory) {
+    const cat = getCat(listFilterCategory);
+    flabel.textContent = cat.emoji + " " + cat.label + " のみ表示中";
+    fbar.style.display = "flex";
+  } else if (listFilterType) {
+    flabel.textContent = (listFilterType==="income" ? "収入" : "支出") + "のみ表示中";
+    fbar.style.display = "flex";
+  } else {
+    fbar.style.display = "none";
+  }
+
+  // 一覧（絞り込み適用）
+  let listFiltered = filtered;
+  if (listFilterType) listFiltered = listFiltered.filter(e => e.type === listFilterType);
+  if (listFilterCategory) listFiltered = listFiltered.filter(e => e.category === listFilterCategory);
+
   const listEl = document.getElementById("list-entries");
   const emptyEl = document.getElementById("list-empty");
-  if(filtered.length===0){ emptyEl.style.display="block"; listEl.innerHTML=""; return; }
+  const emptyText = document.getElementById("list-empty-text");
+  if(listFiltered.length===0){
+    emptyText.textContent = (listFilterType || listFilterCategory) ? "この条件の記録はありません" : "この月の記録はまだありません";
+    emptyEl.style.display="block"; listEl.innerHTML=""; return;
+  }
   emptyEl.style.display="none";
-  listEl.innerHTML = filtered.map(e=>{
+  listEl.innerHTML = listFiltered.map(e=>{
     const cat=getCat(e.category);
     return `<div class="entry-card" style="border-left:4px solid ${cat.color}">
       <span style="font-size:24px">${cat.emoji}</span>
